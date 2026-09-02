@@ -7,8 +7,22 @@
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
     body { font-family: system-ui, sans-serif; text-align: center; padding: 20px; background: #0f172a; color: white; margin: 0; }
-    h2 { font-size: 1.3rem; margin-bottom: 10px; }
+    h2 { font-size: 1.3rem; margin-bottom: 15px; }
     #reader { width: 100%; max-width: 360px; margin: 15px auto; border-radius: 12px; overflow: hidden; background: #1e293b; }
+    .upload-container { margin: 20px auto; max-width: 360px; }
+    .btn-upload {
+      display: inline-block;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 12px 20px;
+      background: #0284c7;
+      color: white;
+      font-weight: bold;
+      border-radius: 8px;
+      cursor: pointer;
+      border: none;
+      font-size: 1rem;
+    }
     .card { background: #1e293b; padding: 15px; border-radius: 10px; max-width: 360px; margin: 20px auto; text-align: left; border: 1px solid #334155; word-break: break-all; }
     .uuid { color: #38bdf8; font-weight: bold; }
   </style>
@@ -16,15 +30,24 @@
 <body>
 
   <h2>Escaneo de Gafetes MINERD</h2>
+
+  <!-- Cámara en vivo -->
   <div id="reader"></div>
 
+  <!-- Botón para adjuntar imágenes -->
+  <div class="upload-container">
+    <label for="qr-input-file" class="btn-upload">📁 Subir o Adjuntar Imagen</label>
+    <input type="file" id="qr-input-file" accept="image/*" style="display: none;">
+  </div>
+
+  <!-- Tarjeta de resultados -->
   <div class="card">
     <p><strong>Enlace:</strong> <span id="link-detectado">Esperando código...</span></p>
     <p><strong>UUID del participante:</strong> <br><span id="uuid-detectado" class="uuid">-</span></p>
   </div>
 
   <script>
-    function onScanSuccess(decodedText) {
+    function procesarResultado(decodedText) {
       document.getElementById('link-detectado').textContent = decodedText;
       
       const partes = decodedText.split('/');
@@ -34,14 +57,36 @@
       if (navigator.vibrate) navigator.vibrate(80);
     }
 
-    const qrScanner = new Html5Qrcode("reader");
-    qrScanner.start(
+    const html5QrCode = new Html5Qrcode("reader");
+
+    // 1. Iniciar cámara en vivo
+    html5QrCode.start(
       { facingMode: "environment" },
       { fps: 15, qrbox: { width: 220, height: 220 } },
-      onScanSuccess
+      (decodedText) => procesarResultado(decodedText)
     ).catch(err => {
-      document.getElementById('link-detectado').textContent = "Permiso denegado o error: " + err;
+      document.getElementById('link-detectado').textContent = "Cámara en espera o desactivada";
+    });
+
+    // 2. Procesar imagen adjuntada
+    const fileInput = document.getElementById('qr-input-file');
+    fileInput.addEventListener('change', async (e) => {
+      if (e.target.files.length === 0) return;
+      const imageFile = e.target.files[0];
+
+      document.getElementById('link-detectado').textContent = "Leyendo archivo adjunto...";
+
+      try {
+        const decodedText = await html5QrCode.scanFile(imageFile, true);
+        procesarResultado(decodedText);
+      } catch (err) {
+        document.getElementById('link-detectado').textContent = "No se detectó un código QR en la imagen.";
+        document.getElementById('uuid-detectado').textContent = "-";
+      } finally {
+        fileInput.value = ''; // Limpiar selector para permitir la misma imagen otra vez
+      }
     });
   </script>
 </body>
 </html>
+
